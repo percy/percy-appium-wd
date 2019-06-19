@@ -1,9 +1,9 @@
-import fs from "fs";
-import jsdom from "jsdom";
-import path from "path";
-import PercyAgent from "@percy/agent";
-import slug from "slug";
-import { Webdriver } from "wd";
+const fs = require("fs");
+const jsdom = require("jsdom");
+const path = require("path");
+const PercyAgent = require("@percy/agent");
+const slug = require("slug");
+const { Webdriver } = require("wd");
 
 // Webdriver extension for taking Percy snapshots
 //

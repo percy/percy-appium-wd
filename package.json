@@ -22,10 +22,14 @@
   "bugs": {
     "url": "https://github.com/percy/percy-appium/issues"
   },
+  "engines": {
+    "node": ">=8.2.0"
+  },
   "homepage": "https://github.com/percy/percy-appium#readme",
   "dependencies": {
     "@percy/agent": "^0.7.2",
     "jsdom": "^15.1.1",
+    "slug": "^1.1.0",
     "wd": "^1.11.2"
   }
 }
