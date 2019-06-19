@@ -1,7 +1,7 @@
 const fs = require("fs");
 const jsdom = require("jsdom");
 const path = require("path");
-const PercyAgent = require("@percy/agent");
+const PercyAgent = require("@percy/agent").default;
 const slug = require("slug");
 const { Webdriver } = require("wd");
 
