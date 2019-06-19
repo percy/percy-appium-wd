@@ -1,0 +1,31 @@
+{
+  "name": "percy-appium",
+  "version": "0.1.0",
+  "description": "A Percy SDK to take screenshots with Percy",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/percy/percy-appium.git"
+  },
+  "keywords": [
+    "appium",
+    "percy",
+    "visual testing",
+    "native visual testing",
+    "react native"
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/percy/percy-appium/issues"
+  },
+  "homepage": "https://github.com/percy/percy-appium#readme",
+  "dependencies": {
+    "@percy/agent": "^0.7.2",
+    "jsdom": "^15.1.1",
+    "wd": "^1.11.2"
+  }
+}
