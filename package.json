@@ -17,7 +17,11 @@
     "native visual testing",
     "react native"
   ],
-  "author": "",
+  "contributors": [
+    "Carly Litchfield <clitchfield@havenhealthcare.com>",
+    "Laura Johannet <ljohannet@havenhealthcare.com>",
+    "Thomas Huston <thuston@havenhealthcare.com>"
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/percy/percy-appium/issues"
