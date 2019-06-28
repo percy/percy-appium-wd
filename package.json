@@ -1,14 +1,14 @@
 {
-  "name": "percy-appium",
+  "name": "@percy/appium-wd",
   "version": "0.1.0",
-  "description": "A Percy SDK to take screenshots with Percy",
+  "description": "Webdriver & Appium client library for visual regression testing with Percy",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/percy/percy-appium.git"
+    "url": "git+https://github.com/percy/percy-appium-wd.git"
   },
   "keywords": [
     "appium",
@@ -24,16 +24,18 @@
   ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/percy/percy-appium/issues"
+    "url": "https://github.com/percy/percy-appium-wd/issues"
   },
   "engines": {
     "node": ">=8.2.0"
   },
-  "homepage": "https://github.com/percy/percy-appium#readme",
+  "homepage": "https://github.com/percy/percy-appium-wd#readme",
   "dependencies": {
-    "@percy/agent": "^0.7.2",
+    "@percy/agent": "~0",
     "jsdom": "^15.1.1",
-    "slug": "^1.1.0",
-    "wd": "^1.11.2"
+    "slug": "^1.1.0"
+  },
+  "peerDependencies": {
+    "wd": "^1"
   }
 }
