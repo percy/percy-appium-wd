@@ -1,18 +1,22 @@
-const fs = require("fs");
-const jsdom = require("jsdom");
-const path = require("path");
-const PercyAgent = require("@percy/agent").default;
-const slug = require("slug");
-const { Webdriver } = require("wd");
+const fs = require('fs');
+const slug = require('slug');
+const path = require('path');
+const jsdom = require('jsdom');
+const pkg = require('./package.json');
+const { Webdriver } = require('wd');
+const webdriverPkg = require('wd/package.json');
+const PercyAgent = require('@percy/agent').default;
 
 // Webdriver extension for taking Percy snapshots
 //
 // Usage:
-//   driver.percySnapshot('My Snapshot');
-Webdriver.prototype.percySnapshot = async function percySnapshot(name) {
-  // Uncomment this section to append the device name to the snapshot name
-  // const capabilities = await this.sessionCapabilities();
-  // name = `${name} [${capabilities.deviceName}]`;
+//   driver.percySnapshot('My Snapshot', { options });
+Webdriver.prototype.percySnapshot = async function percySnapshot(name, options = {}) {
+  // Appends the device name to the snapshot name
+  if (options.appendDeviceName) {
+    const capabilities = await this.sessionCapabilities();
+    name = `${name} [${capabilities.deviceName}]`;
+  }
 
   // Get the dimensions of the device so we can render the screenshot
   // at the correct size
@@ -22,7 +26,7 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name) {
   const rawBase64Data = await this.takeScreenshot();
 
   // Strip out the spaces and newlines from the raw screenshot response
-  const base64Data = rawBase64Data.replace(/([ \r\n]+)/g, "");
+  const base64Data = rawBase64Data.replace(/([ \r\n]+)/g, '');
 
   // Create styles for a DOM element that will render the screenshot
   const css = `
@@ -35,7 +39,7 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name) {
 
   // Percy Agent and JSDOM don't play nicely together if you try to use a
   // <style> tag in the document, but using inline styles seems to work
-  const inlineStyle = css.replace(/([\s]*)\n([\s]*)/g, "");
+  const inlineStyle = css.replace(/([\s]*)\n([\s]*)/g, '');
 
   // Create a fake HTML document that just renders a single DOM node with
   // the screenshot
@@ -54,11 +58,12 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name) {
   // Wrap the HTML in JSDOM
   const dom = new jsdom.JSDOM(html, {
     // The URL must be set or the Percy agent uploading it will fail
-    url: "http://localhost"
+    url: 'http://localhost'
   });
 
   const percyClient = new PercyAgent({
-    clientInfo: "@percy/appium" // TODO
+    clientInfo: `${pkg.name}/${pkg.version}`,
+    environmentInfo: `wd/${webdriverPkg.version}`
   });
 
   // Upload the fake document to Percy
@@ -69,23 +74,20 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name) {
   });
 
   // In debug mode, write the document to disk locally
-  if (process.env.LOG_LEVEL === "debug") {
+  if (process.env.LOG_LEVEL === 'debug') {
     writePercyDebugSnapshot(name, dom.window.document);
   }
 };
 
 function writePercyDebugSnapshot(name, document) {
-  const rootDir = path.join(__dirname, "..", "..");
-  const percyDebugDir = path.join(rootDir, ".percy-debug");
+  const rootDir = path.join(__dirname, '..', '..');
+  const percyDebugDir = path.join(rootDir, '.percy-debug');
 
   if (!fs.existsSync(percyDebugDir)) {
     fs.mkdirSync(percyDebugDir);
   }
 
   const snapshotPath = path.join(percyDebugDir, `${slug(name)}.html`);
-  fs.writeFileSync(
-    snapshotPath,
-    document.documentElement && document.documentElement.outerHTML
-  );
+  fs.writeFileSync(snapshotPath, document.documentElement && document.documentElement.outerHTML);
   console.log(`Percy debug snapshot written to ${snapshotPath}`);
 }
