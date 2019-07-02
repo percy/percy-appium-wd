@@ -1,6 +1,6 @@
 {
   "name": "@percy/appium-wd",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Webdriver & Appium client library for visual regression testing with Percy",
   "main": "index.js",
   "scripts": {
