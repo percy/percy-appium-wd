@@ -80,8 +80,7 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
 };
 
 function writePercyDebugSnapshot(name, document) {
-  const rootDir = path.join(__dirname, '..', '..');
-  const percyDebugDir = path.join(rootDir, '.percy-debug');
+  const percyDebugDir = path.join(process.cwd(), '.percy-debug');
 
   if (!fs.existsSync(percyDebugDir)) {
     fs.mkdirSync(percyDebugDir);
