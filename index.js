@@ -6,6 +6,7 @@ const pkg = require('./package.json');
 const { Webdriver } = require('wd');
 const webdriverPkg = require('wd/package.json');
 const PercyAgent = require('@percy/agent').default;
+const { postSnapshot } = require('@percy/agent/dist/utils/sdk-utils');
 
 // Webdriver extension for taking Percy snapshots
 //
@@ -61,17 +62,34 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
     url: 'http://localhost'
   });
 
+  const clientInfo = `${pkg.name}/${pkg.version}`;
+  const environmentInfo = `wd/${webdriverPkg.version}`;
+
   const percyClient = new PercyAgent({
-    clientInfo: `${pkg.name}/${pkg.version}`,
-    environmentInfo: `wd/${webdriverPkg.version}`
+    clientInfo,
+    environmentInfo,
+    handleAgentCommunication: false
   });
 
-  // Upload the fake document to Percy
-  percyClient.snapshot(name, {
-    document: dom.window.document,
-    minHeight: dimensions.height,
-    widths: [dimensions.width]
+  // Capture the fake document
+  const domSnapshot = percyClient.snapshot(name, {
+    document: dom.window.document
   });
+
+  // Post the fake document to Percy from the node process
+  const postSuccess = await postSnapshot({
+    name,
+    clientInfo,
+    domSnapshot,
+    environmentInfo,
+    url: 'http://localhost/',
+    widths: [dimensions.width],
+    minHeight: dimensions.height
+  });
+
+  if (!postSuccess) {
+    console.log('[percy] Error posting snapshot to agent.');
+  }
 
   // In debug mode, write the document to disk locally
   if (process.env.LOG_LEVEL === 'debug') {
