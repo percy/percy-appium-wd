@@ -6,6 +6,7 @@ const pkg = require('./package.json');
 const { Webdriver } = require('wd');
 const webdriverPkg = require('wd/package.json');
 const PercyAgent = require('@percy/agent').default;
+const { postSnapshot } = require('@percy/agent/dist/utils/sdk-utils');
 
 // Webdriver extension for taking Percy snapshots
 //
@@ -21,6 +22,10 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
   // Get the dimensions of the device so we can render the screenshot
   // at the correct size
   const dimensions = await this.getWindowSize();
+  // Instead of creating a whole build with a seperate info.plist to
+  // be able to hide the status bar you can set this option to push
+  // the screenshot up and cut off the status bar before it's sent
+  const marginTop = options.hideStatusBar ? '-40' : '0';
 
   // Get the base64-encoded screenshot of the app
   const rawBase64Data = await this.takeScreenshot();
@@ -35,6 +40,7 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
     background-size: contain;
     height: ${dimensions.height}px;
     width: ${dimensions.width}px;
+    margin-top: ${marginTop}px;
   `;
 
   // Percy Agent and JSDOM don't play nicely together if you try to use a
@@ -61,17 +67,34 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
     url: 'http://localhost'
   });
 
+  const clientInfo = `${pkg.name}/${pkg.version}`;
+  const environmentInfo = `wd/${webdriverPkg.version}`;
+
   const percyClient = new PercyAgent({
-    clientInfo: `${pkg.name}/${pkg.version}`,
-    environmentInfo: `wd/${webdriverPkg.version}`
+    clientInfo,
+    environmentInfo,
+    handleAgentCommunication: false
   });
 
-  // Upload the fake document to Percy
-  percyClient.snapshot(name, {
-    document: dom.window.document,
-    minHeight: dimensions.height,
-    widths: [dimensions.width]
+  // Capture the fake document
+  const domSnapshot = percyClient.snapshot(name, {
+    document: dom.window.document
   });
+
+  // Post the fake document to Percy from the node process
+  const postSuccess = await postSnapshot({
+    name,
+    clientInfo,
+    domSnapshot,
+    environmentInfo,
+    url: 'http://localhost/',
+    widths: [dimensions.width],
+    minHeight: dimensions.height
+  });
+
+  if (!postSuccess) {
+    console.log('[percy] Error posting snapshot to agent.');
+  }
 
   // In debug mode, write the document to disk locally
   if (process.env.LOG_LEVEL === 'debug') {
