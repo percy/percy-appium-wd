@@ -25,7 +25,10 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
   // Instead of creating a whole build with a seperate info.plist to
   // be able to hide the status bar you can set this option to push
   // the screenshot up and cut off the status bar before it's sent
-  const marginTop = options.hideStatusBar ? '-40' : '0';
+  var marginTop = 0;
+  if (options.hideStatusBar) {
+    dimensions.height > 700 ? (marginTop = '-10%') : (marginTop = '-5%');
+  }
 
   // Get the base64-encoded screenshot of the app
   const rawBase64Data = await this.takeScreenshot();
