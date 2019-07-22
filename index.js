@@ -30,6 +30,7 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
   const base64Data = rawBase64Data.replace(/([ \r\n]+)/g, '');
 
   // Create styles for a DOM element that will render the screenshot
+  // `customCss` needs to be configured similar to below. (ex: `margin: 10px;`)
   const css = `
     background-image: url('data:image/png;base64,${base64Data}');
     background-repeat: no-repeat;
