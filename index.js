@@ -22,6 +22,10 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
   // Get the dimensions of the device so we can render the screenshot
   // at the correct size
   const dimensions = await this.getWindowSize();
+  // Instead of creating a whole build with a seperate info.plist to
+  // be able to hide the status bar you can set this option to push
+  // the screenshot up and cut off the status bar before it's sent
+  const marginTop = options.hideStatusBar ? '-40' : '0';
 
   // Get the base64-encoded screenshot of the app
   const rawBase64Data = await this.takeScreenshot();
