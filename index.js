@@ -40,6 +40,12 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
     ${options.customCss}
   `;
 
+  if (options.customCss) {
+    console.warning(
+      `The "customCss" option has been deprecated in favor of "percyCSS" (used in the ${name} snapshot). "customCss"" will be removed in future versions.`
+    );
+  }
+
   // Percy Agent and JSDOM don't play nicely together if you try to use a
   // <style> tag in the document, but using inline styles seems to work
   const inlineStyle = css.replace(/([\s]*)\n([\s]*)/g, '');
@@ -86,7 +92,8 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
     environmentInfo,
     url: 'http://localhost/',
     widths: [dimensions.width],
-    minHeight: dimensions.height
+    minHeight: dimensions.height,
+    percyCSS: options.percyCSS
   });
 
   if (!postSuccess) {
