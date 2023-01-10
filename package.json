@@ -32,7 +32,7 @@
   },
   "homepage": "https://github.com/percy/percy-appium-wd#readme",
   "dependencies": {
-    "@percy/agent": "~0",
+    "@percy/agent": "~0.26.3",
     "jsdom": "^15.1.1",
     "slug": "^1.1.0"
   },
