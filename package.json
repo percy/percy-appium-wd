@@ -36,6 +36,11 @@
     "jsdom": "^15.1.1",
     "slug": "^1.1.0"
   },
+  "overrides": {
+    "minimist": ">=1.2.6",
+    "json-schema": ">=0.4.0",
+    "axios": "0.30.0"
+  },
   "peerDependencies": {
     "wd": "^1"
   }

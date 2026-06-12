@@ -8,6 +8,19 @@ const webdriverPkg = require('wd/package.json');
 const PercyAgent = require('@percy/agent').default;
 const { postSnapshot } = require('@percy/agent/dist/utils/sdk-utils');
 
+// HTML-entity-encode a value before interpolating it into markup. The snapshot
+// `name` is caller-supplied and is injected into the document <title>, so it
+// must be escaped to prevent HTML/script injection (CWE-79).
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
+
 // Webdriver extension for taking Percy snapshots
 //
 // Usage:
@@ -56,7 +69,7 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
     <!DOCTYPE html>
     <html>
       <head>
-        <title>${name}</title>
+        <title>${escapeHtml(name)}</title>
       </head>
       <body style="margin: 0;">
         <div style="${inlineStyle}"></div>
