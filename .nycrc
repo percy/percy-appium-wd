@@ -1,0 +1,16 @@
+{
+  "all": true,
+  "include": [
+    "index.js"
+  ],
+  "reporter": [
+    "text",
+    "text-summary",
+    "lcov"
+  ],
+  "check-coverage": true,
+  "lines": 100,
+  "branches": 100,
+  "functions": 100,
+  "statements": 100
+}
