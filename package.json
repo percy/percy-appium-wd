@@ -4,7 +4,7 @@
   "description": "Webdriver & Appium client library for visual regression testing with Percy",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "nyc --check-coverage --lines 100 mocha"
   },
   "repository": {
     "type": "git",
@@ -38,5 +38,11 @@
   },
   "peerDependencies": {
     "wd": "^1"
+  },
+  "devDependencies": {
+    "mocha": "^9.2.2",
+    "nyc": "^15.1.0",
+    "proxyquire": "^2.1.3",
+    "sinon": "^13.0.2"
   }
 }
