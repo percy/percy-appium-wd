@@ -5,6 +5,12 @@ on:
     branches: ["master", "main"]
   push:
     branches: ["master", "main"]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Which branch of @percy/cli to build from source for this run
+        required: false
+        default: master
 
 permissions:
   contents: read
@@ -24,5 +30,32 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
         run: npm install
+      - uses: actions-ecosystem/action-regex-match@v2
+        id: regex-match
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        with:
+          text: ${{ github.event.inputs.branch }}
+          regex: '^[a-zA-Z0-9_/\-]+$'
+      - name: Break on invalid branch name
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.regex-match.outputs && steps.regex-match.outputs.match == '' }}
+        run: exit 1
+      - name: Set up @percy/cli from git
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          BRANCH: ${{ github.event.inputs.branch }}
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          cd /tmp
+          git clone --branch "$BRANCH" --depth 1 https://github.com/percy/cli
+          cd cli
+          PERCY_PACKAGES=`find packages -mindepth 1 -maxdepth 1 -type d | sed -e 's/packages/@percy/g' | tr '\n' ' '`
+          yarn
+          yarn build
+          yarn global:link
+          cd "$WORKSPACE"
+          yarn link $PERCY_PACKAGES >/dev/null 2>&1 || true
+          echo "$(yarn global bin)" >> "$GITHUB_PATH"
+          export PATH="$(yarn global bin):$PATH"
+          percy --version
       - name: Run tests with 100% line coverage gate
         run: npm test
