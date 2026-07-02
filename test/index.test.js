@@ -178,6 +178,31 @@ describe('@percy/appium-wd', () => {
     assert.ok(mocks.fs.writeFileSync.notCalled);
   });
 
+  it('HTML-escapes special characters in the snapshot name before injecting it into <title>', async () => {
+    const { Webdriver, mocks } = loadIndex();
+    const driver = makeDriver(Webdriver);
+
+    const malicious = `</title><script>alert('xss')</script> & "quoted"`;
+    await driver.percySnapshot(malicious);
+
+    const { html } = mocks.jsdomCalls[0];
+    // The raw markup-breaking characters must not survive into the document.
+    assert.ok(!html.includes('<script>'));
+    assert.ok(!html.includes('</title><script>'));
+    // Each special character is entity-encoded inside the title.
+    assert.ok(
+      html.includes(
+        '<title>&lt;/title&gt;&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt; &amp; &quot;quoted&quot;</title>'
+      )
+    );
+
+    // The original, unescaped name is still used for the snapshot payload and
+    // PercyAgent call (escaping is presentation-only, scoped to the markup).
+    const payload = mocks.postSnapshot.firstCall.args[0];
+    assert.strictEqual(payload.name, malicious);
+    assert.ok(mocks.percyAgentInstances[0].snapshot.calledOnceWith(malicious));
+  });
+
   it('appends the device name when appendDeviceName is set', async () => {
     const { Webdriver, mocks } = loadIndex();
     const driver = makeDriver(Webdriver, { capabilities: { deviceName: 'Pixel 6' } });
