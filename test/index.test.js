@@ -112,23 +112,18 @@ function makeDriver(Webdriver, opts = {}) {
 
 describe('@percy/appium-wd', () => {
   let consoleLog;
-  let consoleWarning;
+  let consoleWarn;
   let originalLogLevel;
 
   beforeEach(() => {
     consoleLog = sinon.stub(console, 'log');
-    // index.js calls console.warning (a bug that should not be "fixed" by us);
-    // it is undefined on console, so we add a stub to keep that branch runnable
-    // and to assert on it without changing runtime behavior of index.js.
-    consoleWarning = sinon.stub();
-    console.warning = consoleWarning;
+    consoleWarn = sinon.stub(console, 'warn');
     originalLogLevel = process.env.LOG_LEVEL;
     delete process.env.LOG_LEVEL;
   });
 
   afterEach(() => {
     sinon.restore();
-    delete console.warning;
     if (originalLogLevel === undefined) {
       delete process.env.LOG_LEVEL;
     } else {
@@ -229,11 +224,14 @@ describe('@percy/appium-wd', () => {
     const { Webdriver, mocks } = loadIndex();
     const driver = makeDriver(Webdriver);
 
+    // console.warning does not exist; the snapshot must not depend on it.
+    assert.strictEqual(console.warning, undefined);
     await driver.percySnapshot('Styled', { customCss: 'margin: 10px;' });
 
-    // Deprecation warning emitted via console.warning for the named snapshot.
-    assert.ok(consoleWarning.calledOnce);
-    assert.match(consoleWarning.firstCall.args[0], /customCss.*deprecated.*Styled/s);
+    // Deprecation warning emitted via console.warn for the named snapshot.
+    assert.ok(consoleWarn.calledOnce);
+    assert.match(consoleWarn.firstCall.args[0], /customCss.*deprecated.*Styled/s);
+    assert.ok(mocks.postSnapshot.calledOnce);
 
     // customCss flows into the inline style of the rendered div.
     const { html } = mocks.jsdomCalls[0];
@@ -249,7 +247,7 @@ describe('@percy/appium-wd', () => {
     const payload = mocks.postSnapshot.firstCall.args[0];
     assert.strictEqual(payload.percyCSS, '.foo { color: red; }');
     // No customCss => no deprecation warning.
-    assert.ok(consoleWarning.notCalled);
+    assert.ok(consoleWarn.notCalled);
   });
 
   it('logs an error when posting the snapshot fails', async () => {
