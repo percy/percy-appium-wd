@@ -54,8 +54,8 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
   `;
 
   if (options.customCss) {
-    console.warning(
-      `The "customCss" option has been deprecated in favor of "percyCSS" (used in the ${name} snapshot). "customCss"" will be removed in future versions.`
+    console.warn(
+      `The "customCss" option has been deprecated in favor of "percyCSS" (used in the ${name} snapshot). "customCss" will be removed in future versions.`
     );
   }
 
