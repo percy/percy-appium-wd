@@ -21,6 +21,13 @@ function escapeHtml(value) {
   })[char]);
 }
 
+// Coerce a device dimension to a finite, non-negative number. Returns null when
+// the value cannot be used safely in CSS or as a snapshot width.
+function toDimension(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
 // Webdriver extension for taking Percy snapshots
 //
 // Usage:
@@ -34,7 +41,16 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
 
   // Get the dimensions of the device so we can render the screenshot
   // at the correct size
-  const dimensions = await this.getWindowSize();
+  const windowSize = await this.getWindowSize();
+  const dimensions = {
+    width: toDimension(windowSize.width),
+    height: toDimension(windowSize.height)
+  };
+
+  if (dimensions.width === null || dimensions.height === null) {
+    console.log(`[percy] Skipping snapshot "${name}": invalid window size received from the driver.`);
+    return;
+  }
 
   // Get the base64-encoded screenshot of the app
   const rawBase64Data = await this.takeScreenshot();
@@ -72,7 +88,7 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
         <title>${escapeHtml(name)}</title>
       </head>
       <body style="margin: 0;">
-        <div style="${inlineStyle}"></div>
+        <div style="${escapeHtml(inlineStyle)}"></div>
       </body>
     </html>
   `;
@@ -122,9 +138,7 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
 function writePercyDebugSnapshot(name, document) {
   const percyDebugDir = path.join(process.cwd(), '.percy-debug');
 
-  if (!fs.existsSync(percyDebugDir)) {
-    fs.mkdirSync(percyDebugDir);
-  }
+  fs.mkdirSync(percyDebugDir, { recursive: true });
 
   const snapshotPath = path.join(percyDebugDir, `${slug(name)}.html`);
   fs.writeFileSync(snapshotPath, document.documentElement && document.documentElement.outerHTML);
