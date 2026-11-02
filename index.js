@@ -22,8 +22,12 @@ function escapeHtml(value) {
 }
 
 // Coerce a device dimension to a finite, non-negative number. Returns null when
-// the value cannot be used safely in CSS or as a snapshot width.
+// the value cannot be used safely in CSS or as a snapshot width. Only numbers
+// and non-blank strings are accepted, since Number(null) and Number('') are 0.
 function toDimension(value) {
+  const isNumeric = typeof value === 'number' || (typeof value === 'string' && value.trim() !== '');
+  if (!isNumeric) return null;
+
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
@@ -138,7 +142,14 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
 function writePercyDebugSnapshot(name, document) {
   const percyDebugDir = path.join(process.cwd(), '.percy-debug');
 
-  fs.mkdirSync(percyDebugDir, { recursive: true });
+  // Create the directory without an existence pre-check (race-free). The
+  // `recursive` option is not available on every supported Node version, so
+  // tolerate EEXIST when the existing path is already a directory.
+  try {
+    fs.mkdirSync(percyDebugDir);
+  } catch (error) {
+    if (error.code !== 'EEXIST' || !fs.statSync(percyDebugDir).isDirectory()) throw error;
+  }
 
   const snapshotPath = path.join(percyDebugDir, `${slug(name)}.html`);
   fs.writeFileSync(snapshotPath, document.documentElement && document.documentElement.outerHTML);

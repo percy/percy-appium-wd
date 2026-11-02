@@ -60,8 +60,12 @@ function loadIndex(overrides = {}) {
   const fsMock = {
     existsSync: sinon.stub().returns(overrides.dirExists === undefined ? true : overrides.dirExists),
     mkdirSync: sinon.stub(),
+    statSync: sinon.stub().returns({ isDirectory: () => overrides.isDirectory !== false }),
     writeFileSync: sinon.stub()
   };
+  if (overrides.mkdirError) {
+    fsMock.mkdirSync.throws(overrides.mkdirError);
+  }
 
   // --- path mock (pass-through-ish, but deterministic) ---------------------
   const pathMock = {
@@ -270,7 +274,15 @@ describe('@percy/appium-wd', () => {
     { width: '100" onmouseover="alert(1)', height: 844 },
     { width: 390, height: 'abc' },
     { width: -1, height: 844 },
-    { width: 390, height: Infinity }
+    { width: 390, height: Infinity },
+    { width: null, height: 844 },
+    { width: 390, height: null },
+    { width: undefined, height: 844 },
+    { width: 390 },
+    { width: '', height: 844 },
+    { width: 390, height: '   ' },
+    { width: false, height: 844 },
+    { width: [], height: 844 }
   ].forEach((dimensions) => {
     it(`skips the snapshot without throwing for invalid window size ${JSON.stringify(dimensions)}`, async () => {
       const { Webdriver, mocks } = loadIndex();
@@ -312,9 +324,13 @@ describe('@percy/appium-wd', () => {
 
     await driver.percySnapshot('Debug Me');
 
-    // Directory created idempotently (no check-then-create race).
+    // Directory created without a check-then-create race, and without the
+    // `recursive` option that older supported Node versions ignore.
     assert.ok(mocks.fs.existsSync.notCalled);
-    assert.ok(mocks.fs.mkdirSync.calledOnceWith(sinon.match(/\.percy-debug$/), { recursive: true }));
+    assert.ok(mocks.fs.mkdirSync.calledOnce);
+    assert.deepStrictEqual(mocks.fs.mkdirSync.firstCall.args.length, 1);
+    assert.match(mocks.fs.mkdirSync.firstCall.args[0], /\.percy-debug$/);
+    assert.ok(mocks.fs.statSync.notCalled);
 
     // File written with the slugged name and the document outerHTML.
     assert.ok(mocks.slug.calledOnceWith('Debug Me'));
@@ -327,16 +343,42 @@ describe('@percy/appium-wd', () => {
     assert.ok(consoleLog.calledWithMatch(/Percy debug snapshot written to/));
   });
 
-  it('writes the debug snapshot when the debug dir already exists', async () => {
+  function fsError(code) {
+    return Object.assign(new Error(`${code}: mock`), { code });
+  }
+
+  it('writes the debug snapshot when mkdir reports EEXIST for an existing directory', async () => {
     process.env.LOG_LEVEL = 'debug';
-    const { Webdriver, mocks } = loadIndex({ dirExists: true });
+    const { Webdriver, mocks } = loadIndex({ mkdirError: fsError('EEXIST'), isDirectory: true });
     const driver = makeDriver(Webdriver);
 
     await driver.percySnapshot('Existing Dir');
+    await driver.percySnapshot('Existing Dir Again');
 
     assert.ok(mocks.fs.existsSync.notCalled);
-    assert.ok(mocks.fs.mkdirSync.calledOnceWith(sinon.match.string, { recursive: true }));
-    assert.ok(mocks.fs.writeFileSync.calledOnce);
+    assert.strictEqual(mocks.fs.mkdirSync.callCount, 2);
+    assert.ok(mocks.fs.statSync.calledWith(sinon.match(/\.percy-debug$/)));
+    assert.strictEqual(mocks.fs.writeFileSync.callCount, 2);
+  });
+
+  it('rethrows EEXIST when the debug path exists but is not a directory', async () => {
+    process.env.LOG_LEVEL = 'debug';
+    const { Webdriver, mocks } = loadIndex({ mkdirError: fsError('EEXIST'), isDirectory: false });
+    const driver = makeDriver(Webdriver);
+
+    await assert.rejects(driver.percySnapshot('File In The Way'), { code: 'EEXIST' });
+    assert.ok(mocks.fs.statSync.calledOnce);
+    assert.ok(mocks.fs.writeFileSync.notCalled);
+  });
+
+  it('rethrows other mkdir errors without inspecting the path', async () => {
+    process.env.LOG_LEVEL = 'debug';
+    const { Webdriver, mocks } = loadIndex({ mkdirError: fsError('EACCES') });
+    const driver = makeDriver(Webdriver);
+
+    await assert.rejects(driver.percySnapshot('No Access'), { code: 'EACCES' });
+    assert.ok(mocks.fs.statSync.notCalled);
+    assert.ok(mocks.fs.writeFileSync.notCalled);
   });
 
   it('writes a falsy body when documentElement is missing', async () => {
