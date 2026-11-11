@@ -21,6 +21,17 @@ function escapeHtml(value) {
   })[char]);
 }
 
+// Coerce a device dimension to a finite, non-negative number. Returns null when
+// the value cannot be used safely in CSS or as a snapshot width. Only numbers
+// and non-blank strings are accepted, since Number(null) and Number('') are 0.
+function toDimension(value) {
+  const isNumeric = typeof value === 'number' || (typeof value === 'string' && value.trim() !== '');
+  if (!isNumeric) return null;
+
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
 // Webdriver extension for taking Percy snapshots
 //
 // Usage:
@@ -34,7 +45,16 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
 
   // Get the dimensions of the device so we can render the screenshot
   // at the correct size
-  const dimensions = await this.getWindowSize();
+  const windowSize = await this.getWindowSize();
+  const dimensions = {
+    width: toDimension(windowSize.width),
+    height: toDimension(windowSize.height)
+  };
+
+  if (dimensions.width === null || dimensions.height === null) {
+    console.log(`[percy] Skipping snapshot "${name}": invalid window size received from the driver.`);
+    return;
+  }
 
   // Get the base64-encoded screenshot of the app
   const rawBase64Data = await this.takeScreenshot();
@@ -72,7 +92,7 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
         <title>${escapeHtml(name)}</title>
       </head>
       <body style="margin: 0;">
-        <div style="${inlineStyle}"></div>
+        <div style="${escapeHtml(inlineStyle)}"></div>
       </body>
     </html>
   `;
@@ -122,8 +142,13 @@ Webdriver.prototype.percySnapshot = async function percySnapshot(name, options =
 function writePercyDebugSnapshot(name, document) {
   const percyDebugDir = path.join(process.cwd(), '.percy-debug');
 
-  if (!fs.existsSync(percyDebugDir)) {
+  // Create the directory without an existence pre-check (race-free). The
+  // `recursive` option is not available on every supported Node version, so
+  // tolerate EEXIST when the existing path is already a directory.
+  try {
     fs.mkdirSync(percyDebugDir);
+  } catch (error) {
+    if (error.code !== 'EEXIST' || !fs.statSync(percyDebugDir).isDirectory()) throw error;
   }
 
   const snapshotPath = path.join(percyDebugDir, `${slug(name)}.html`);

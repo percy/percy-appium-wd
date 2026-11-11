@@ -60,8 +60,12 @@ function loadIndex(overrides = {}) {
   const fsMock = {
     existsSync: sinon.stub().returns(overrides.dirExists === undefined ? true : overrides.dirExists),
     mkdirSync: sinon.stub(),
+    statSync: sinon.stub().returns({ isDirectory: () => overrides.isDirectory !== false }),
     writeFileSync: sinon.stub()
   };
+  if (overrides.mkdirError) {
+    fsMock.mkdirSync.throws(overrides.mkdirError);
+  }
 
   // --- path mock (pass-through-ish, but deterministic) ---------------------
   const pathMock = {
@@ -238,6 +242,60 @@ describe('@percy/appium-wd', () => {
     assert.ok(html.includes('margin: 10px;'));
   });
 
+  it('HTML-escapes customCss so it cannot break out of the style attribute', async () => {
+    const { Webdriver, mocks } = loadIndex();
+    const driver = makeDriver(Webdriver);
+
+    await driver.percySnapshot('Breakout', {
+      customCss: `color: red;" onmouseover="alert(1)"><script>alert(2)</script><div style="`
+    });
+
+    const { html } = mocks.jsdomCalls[0];
+    assert.ok(!html.includes('" onmouseover="'));
+    assert.ok(!html.includes('<script>'));
+    assert.ok(html.includes('color: red;&quot; onmouseover=&quot;alert(1)&quot;&gt;&lt;script&gt;'));
+    assert.ok(mocks.postSnapshot.calledOnce);
+  });
+
+  it('coerces numeric-string window dimensions to numbers', async () => {
+    const { Webdriver, mocks } = loadIndex();
+    const driver = makeDriver(Webdriver, { dimensions: { width: '390', height: '844' } });
+
+    await driver.percySnapshot('Strings');
+
+    const { html } = mocks.jsdomCalls[0];
+    assert.ok(html.includes('height: 844px;width: 390px;'));
+    const payload = mocks.postSnapshot.firstCall.args[0];
+    assert.deepStrictEqual(payload.widths, [390]);
+    assert.strictEqual(payload.minHeight, 844);
+  });
+
+  [
+    { width: '100" onmouseover="alert(1)', height: 844 },
+    { width: 390, height: 'abc' },
+    { width: -1, height: 844 },
+    { width: 390, height: Infinity },
+    { width: null, height: 844 },
+    { width: 390, height: null },
+    { width: undefined, height: 844 },
+    { width: 390 },
+    { width: '', height: 844 },
+    { width: 390, height: '   ' },
+    { width: false, height: 844 },
+    { width: [], height: 844 }
+  ].forEach((dimensions) => {
+    it(`skips the snapshot without throwing for invalid window size ${JSON.stringify(dimensions)}`, async () => {
+      const { Webdriver, mocks } = loadIndex();
+      const driver = makeDriver(Webdriver, { dimensions });
+
+      await driver.percySnapshot('Bad Size');
+
+      assert.strictEqual(mocks.jsdomCalls.length, 0);
+      assert.ok(mocks.postSnapshot.notCalled);
+      assert.ok(consoleLog.calledOnceWithMatch(/Skipping snapshot "Bad Size": invalid window size/));
+    });
+  });
+
   it('passes percyCSS through to postSnapshot', async () => {
     const { Webdriver, mocks } = loadIndex();
     const driver = makeDriver(Webdriver);
@@ -266,9 +324,13 @@ describe('@percy/appium-wd', () => {
 
     await driver.percySnapshot('Debug Me');
 
-    // Directory missing => created.
-    assert.ok(mocks.fs.existsSync.calledOnce);
+    // Directory created without a check-then-create race, and without the
+    // `recursive` option that older supported Node versions ignore.
+    assert.ok(mocks.fs.existsSync.notCalled);
     assert.ok(mocks.fs.mkdirSync.calledOnce);
+    assert.deepStrictEqual(mocks.fs.mkdirSync.firstCall.args.length, 1);
+    assert.match(mocks.fs.mkdirSync.firstCall.args[0], /\.percy-debug$/);
+    assert.ok(mocks.fs.statSync.notCalled);
 
     // File written with the slugged name and the document outerHTML.
     assert.ok(mocks.slug.calledOnceWith('Debug Me'));
@@ -281,16 +343,42 @@ describe('@percy/appium-wd', () => {
     assert.ok(consoleLog.calledWithMatch(/Percy debug snapshot written to/));
   });
 
-  it('does not recreate the debug dir when it already exists', async () => {
+  function fsError(code) {
+    return Object.assign(new Error(`${code}: mock`), { code });
+  }
+
+  it('writes the debug snapshot when mkdir reports EEXIST for an existing directory', async () => {
     process.env.LOG_LEVEL = 'debug';
-    const { Webdriver, mocks } = loadIndex({ dirExists: true });
+    const { Webdriver, mocks } = loadIndex({ mkdirError: fsError('EEXIST'), isDirectory: true });
     const driver = makeDriver(Webdriver);
 
     await driver.percySnapshot('Existing Dir');
+    await driver.percySnapshot('Existing Dir Again');
 
-    assert.ok(mocks.fs.existsSync.calledOnce);
-    assert.ok(mocks.fs.mkdirSync.notCalled);
-    assert.ok(mocks.fs.writeFileSync.calledOnce);
+    assert.ok(mocks.fs.existsSync.notCalled);
+    assert.strictEqual(mocks.fs.mkdirSync.callCount, 2);
+    assert.ok(mocks.fs.statSync.calledWith(sinon.match(/\.percy-debug$/)));
+    assert.strictEqual(mocks.fs.writeFileSync.callCount, 2);
+  });
+
+  it('rethrows EEXIST when the debug path exists but is not a directory', async () => {
+    process.env.LOG_LEVEL = 'debug';
+    const { Webdriver, mocks } = loadIndex({ mkdirError: fsError('EEXIST'), isDirectory: false });
+    const driver = makeDriver(Webdriver);
+
+    await assert.rejects(driver.percySnapshot('File In The Way'), { code: 'EEXIST' });
+    assert.ok(mocks.fs.statSync.calledOnce);
+    assert.ok(mocks.fs.writeFileSync.notCalled);
+  });
+
+  it('rethrows other mkdir errors without inspecting the path', async () => {
+    process.env.LOG_LEVEL = 'debug';
+    const { Webdriver, mocks } = loadIndex({ mkdirError: fsError('EACCES') });
+    const driver = makeDriver(Webdriver);
+
+    await assert.rejects(driver.percySnapshot('No Access'), { code: 'EACCES' });
+    assert.ok(mocks.fs.statSync.notCalled);
+    assert.ok(mocks.fs.writeFileSync.notCalled);
   });
 
   it('writes a falsy body when documentElement is missing', async () => {
